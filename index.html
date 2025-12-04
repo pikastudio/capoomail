@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Capoomail</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+</head>
+<body>
+  <h1>Welcome to Capoomail</h1>
+  <button id="loginBtn">Login / Signup with GitHub</button>
+
+  <script type="module">
+    // Firebase config (your shrine keys)
+    const firebaseConfig = {
+      apiKey: "AIzaSyAPkWlmoajpN7OaOcgtLXtWdFgogvLm2pc",
+      authDomain: "capoomail-backend.firebaseapp.com",
+      projectId: "capoomail-backend",
+      storageBucket: "capoomail-backend.firebasestorage.app",
+      messagingSenderId: "896867372320",
+      appId: "1:896867372320:web:0a7fa3ae917295f6269b45",
+      measurementId: "G-NTY7TV7F87"
+    };
+
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // GitHub provider
+    const provider = new firebase.auth.GithubAuthProvider();
+
+    // Button ritual
+    document.getElementById("loginBtn").addEventListener("click", () => {
+      auth.signInWithPopup(provider)
+        .then(async (result) => {
+          const user = result.user;
+          console.log("Signed in:", user.email);
+
+          // Store user in Firestore
+          await db.collection("users").doc(user.uid).set({
+            username: user.displayName || "ShrineUser",
+            email: user.email
+          });
+        })
+        .catch((error) => {
+          console.error("Error:", error);
+        });
+    });
+  </script>
+</body>
+</html>
