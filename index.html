@@ -12,14 +12,14 @@
     body { font-family:"Segoe UI",Arial,sans-serif; background:linear-gradient(135deg,#74ebd5,#ACB6E5);
       display:flex; flex-direction:column; align-items:center; padding:20px; min-height:100vh; margin:0; }
     h1 { font-size:2.5em; margin-bottom:20px; color:#2c3e50; }
-    #loginBtn,#sendBtn { background:#3498db; color:white; border:none; padding:12px 25px; font-size:1.1em;
-      border-radius:8px; cursor:pointer; transition:all 0.3s ease; margin-top:15px; }
-    #loginBtn:hover,#sendBtn:hover { background:#2980b9; transform:scale(1.05); }
+    #loginBtn,#sendBtn,#saveAddressBtn { background:#3498db; color:white; border:none; padding:12px 25px;
+      font-size:1.1em; border-radius:8px; cursor:pointer; transition:all 0.3s ease; margin-top:15px; }
+    #loginBtn:hover,#sendBtn:hover,#saveAddressBtn:hover { background:#2980b9; transform:scale(1.05); }
     #emailForm { display:none; flex-direction:column; margin-top:20px; width:300px; }
     input,textarea { margin:8px 0; padding:10px; border-radius:6px; border:1px solid #ccc; }
     textarea { resize:vertical; min-height:100px; }
     #inbox { margin-top:30px; width:80%; max-width:600px; background:#fff; padding:15px; border-radius:8px;
-      box-shadow:0 4px 6px rgba(0,0,0,0.2); }
+      box-shadow:0 4px 6px rgba(0,0,0,0.2); display:none; }
     .message { border-bottom:1px solid #ddd; padding:10px 0; }
     .message:last-child { border-bottom:none; }
     .from { font-weight:bold; color:#3498db; }
@@ -34,7 +34,7 @@
   <form id="emailForm">
     <div id="chooseAddress">
       <label>
-        Choose your Capoomail address:
+        Choose your Capoomail address (one time only):
         <div style="display:flex;align-items:center;">
           <input type="text" id="senderName" placeholder="yourname" required>
           <span>@capoomail.com</span>
@@ -50,12 +50,13 @@
   </form>
 
   <!-- Inbox -->
-  <div id="inbox" style="display:none;">
+  <div id="inbox">
     <h2>Your Shrine Inbox</h2>
     <div id="messages"></div>
   </div>
 
   <script>
+    // Firebase config
     var firebaseConfig = {
       apiKey: "AIzaSyAPkWlmoajpN7OaOcgtLXtWdFgogvLm2pc",
       authDomain: "capoomail-backend.firebaseapp.com",
@@ -80,9 +81,10 @@
 
     var currentAddress = null;
 
+    // Login ritual
     loginBtn.addEventListener("click", function() {
       auth.signInWithPopup(provider)
-        .then(function(result) {
+        .then(function() {
           alert("Signed in! Choose your Capoomail address.");
           emailForm.style.display = "flex";
           loginBtn.style.display = "none";
@@ -92,6 +94,7 @@
         });
     });
 
+    // Save one-time Capoomail address
     saveAddressBtn.addEventListener("click", function() {
       var senderName = document.getElementById("senderName").value.trim();
       if (!senderName) { alert("Please enter a name."); return; }
@@ -99,7 +102,7 @@
       alert("Your Capoomail address is set: " + currentAddress);
       document.getElementById("chooseAddress").style.display = "none";
 
-      // Start listening to inbox
+      // Start realtime inbox listener
       inboxDiv.style.display = "block";
       db.ref("messages").orderByChild("to").equalTo(currentAddress)
         .on("child_added", function(snapshot) {
@@ -113,6 +116,7 @@
         });
     });
 
+    // Send message
     sendBtn.addEventListener("click", function() {
       if (!currentAddress) {
         alert("You must set your Capoomail address first.");
