@@ -80,14 +80,29 @@
     var inboxDiv = document.getElementById("inbox");
 
     var currentAddress = null;
+    var currentUser = null;
 
     // Login ritual
     loginBtn.addEventListener("click", function() {
       auth.signInWithPopup(provider)
-        .then(function() {
-          alert("Signed in! Choose your Capoomail address.");
-          emailForm.style.display = "flex";
-          loginBtn.style.display = "none";
+        .then(function(result) {
+          currentUser = result.user;
+          alert("Signed in! Checking shrine identity…");
+
+          // Check if user already has a Capoomail address
+          db.ref("users/" + currentUser.uid).once("value").then(snapshot => {
+            if (snapshot.exists() && snapshot.val().capooAddress) {
+              currentAddress = snapshot.val().capooAddress;
+              alert("Your Capoomail address: " + currentAddress);
+              document.getElementById("chooseAddress").style.display = "none";
+              startInboxListener();
+            } else {
+              alert("Choose your Capoomail address (one time only).");
+              document.getElementById("chooseAddress").style.display = "block";
+            }
+            emailForm.style.display = "flex";
+            loginBtn.style.display = "none";
+          });
         })
         .catch(function(error) {
           alert("Error: " + error.message);
@@ -99,21 +114,15 @@
       var senderName = document.getElementById("senderName").value.trim();
       if (!senderName) { alert("Please enter a name."); return; }
       currentAddress = senderName + "@capoomail.com";
-      alert("Your Capoomail address is set: " + currentAddress);
-      document.getElementById("chooseAddress").style.display = "none";
 
-      // Start realtime inbox listener
-      inboxDiv.style.display = "block";
-      db.ref("messages").orderByChild("to").equalTo(currentAddress)
-        .on("child_added", function(snapshot) {
-          var msg = snapshot.val();
-          var div = document.createElement("div");
-          div.className = "message";
-          div.innerHTML = "<div class='from'>From: " + msg.from + "</div>" +
-                          "<div class='subject'>Subject: " + msg.subject + "</div>" +
-                          "<div>" + msg.body + "</div>";
-          messagesDiv.prepend(div);
-        });
+      db.ref("users/" + currentUser.uid).set({
+        capooAddress: currentAddress,
+        createdAt: firebase.database.ServerValue.TIMESTAMP
+      }).then(() => {
+        alert("Your Capoomail address is set: " + currentAddress);
+        document.getElementById("chooseAddress").style.display = "none";
+        startInboxListener();
+      });
     });
 
     // Send message
@@ -140,6 +149,21 @@
         alert("Error sending message: " + error.message);
       });
     });
+
+    // Realtime inbox listener
+    function startInboxListener() {
+      inboxDiv.style.display = "block";
+      db.ref("messages").orderByChild("to").equalTo(currentAddress)
+        .on("child_added", function(snapshot) {
+          var msg = snapshot.val();
+          var div = document.createElement("div");
+          div.className = "message";
+          div.innerHTML = "<div class='from'>From: " + msg.from + "</div>" +
+                          "<div class='subject'>Subject: " + msg.subject + "</div>" +
+                          "<div>" + msg.body + "</div>";
+          messagesDiv.prepend(div);
+        });
+    }
   </script>
 </body>
 </html>
