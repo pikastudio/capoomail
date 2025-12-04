@@ -3,35 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <title>Capoomail</title>
+  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <style>
-    body {
-      font-family: "Segoe UI", Arial, sans-serif;
-      background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      min-height: 100vh;
-      margin: 0;
-      padding: 20px;
-      color: #222;
-    }
-    h1 { font-size: 2.5em; margin-bottom: 20px; color: #2c3e50; }
-    #loginBtn, #sendBtn {
-      background: #3498db; color: white; border: none;
-      padding: 12px 25px; font-size: 1.1em;
-      border-radius: 8px; cursor: pointer;
-      transition: all 0.3s ease; margin-top: 15px;
-    }
-    #loginBtn:hover, #sendBtn:hover { background: #2980b9; transform: scale(1.05); }
-    #emailForm { display: none; flex-direction: column; margin-top: 20px; width: 300px; }
-    input, textarea { margin: 8px 0; padding: 10px; border-radius: 6px; border: 1px solid #ccc; }
-    textarea { resize: vertical; min-height: 100px; }
-    .suffix { font-weight: bold; margin-left: 5px; }
+    body { font-family:"Segoe UI",Arial,sans-serif; background:linear-gradient(135deg,#74ebd5,#ACB6E5);
+      display:flex; flex-direction:column; align-items:center; padding:20px; min-height:100vh; margin:0; }
+    h1 { font-size:2.5em; margin-bottom:20px; color:#2c3e50; }
+    #loginBtn,#sendBtn { background:#3498db; color:white; border:none; padding:12px 25px; font-size:1.1em;
+      border-radius:8px; cursor:pointer; transition:all 0.3s ease; margin-top:15px; }
+    #loginBtn:hover,#sendBtn:hover { background:#2980b9; transform:scale(1.05); }
+    #emailForm { display:none; flex-direction:column; margin-top:20px; width:300px; }
+    input,textarea { margin:8px 0; padding:10px; border-radius:6px; border:1px solid #ccc; }
+    textarea { resize:vertical; min-height:100px; }
+    #inbox { margin-top:30px; width:80%; max-width:600px; background:#fff; padding:15px; border-radius:8px;
+      box-shadow:0 4px 6px rgba(0,0,0,0.2); }
+    .message { border-bottom:1px solid #ddd; padding:10px 0; }
+    .message:last-child { border-bottom:none; }
+    .from { font-weight:bold; color:#3498db; }
+    .subject { font-style:italic; }
   </style>
 </head>
 <body>
@@ -40,14 +32,16 @@
 
   <!-- Email creation form -->
   <form id="emailForm">
-    <!-- User chooses their shrine email name -->
-    <label>
-      Choose your Capoomail address:
-      <div style="display:flex;align-items:center;">
-        <input type="text" id="senderName" placeholder="yourname" required>
-        <span class="suffix">@capoomail.com</span>
-      </div>
-    </label>
+    <div id="chooseAddress">
+      <label>
+        Choose your Capoomail address:
+        <div style="display:flex;align-items:center;">
+          <input type="text" id="senderName" placeholder="yourname" required>
+          <span>@capoomail.com</span>
+        </div>
+      </label>
+      <button type="button" id="saveAddressBtn">Save Address</button>
+    </div>
 
     <input type="text" id="to" placeholder="Recipient email" required>
     <input type="text" id="subject" placeholder="Subject" required>
@@ -55,26 +49,36 @@
     <button type="button" id="sendBtn">Send Email</button>
   </form>
 
+  <!-- Inbox -->
+  <div id="inbox" style="display:none;">
+    <h2>Your Shrine Inbox</h2>
+    <div id="messages"></div>
+  </div>
+
   <script>
-    // Firebase config
     var firebaseConfig = {
       apiKey: "AIzaSyAPkWlmoajpN7OaOcgtLXtWdFgogvLm2pc",
       authDomain: "capoomail-backend.firebaseapp.com",
+      databaseURL: "https://capoomail-backend-default-rtdb.firebaseio.com",
       projectId: "capoomail-backend",
-      storageBucket: "capoomail-backend.firebasestorage.app",
+      storageBucket: "capoomail-backend.appspot.com",
       messagingSenderId: "896867372320",
-      appId: "1:896867372320:web:0a7fa3ae917295f6269b45",
-      measurementId: "G-NTY7TV7F87"
+      appId: "1:896867372320:web:0a7fa3ae917295f6269b45"
     };
     firebase.initializeApp(firebaseConfig);
 
     var auth = firebase.auth();
-    var db = firebase.firestore();
+    var db = firebase.database();
     var provider = new firebase.auth.GithubAuthProvider();
 
     var loginBtn = document.getElementById("loginBtn");
     var emailForm = document.getElementById("emailForm");
     var sendBtn = document.getElementById("sendBtn");
+    var saveAddressBtn = document.getElementById("saveAddressBtn");
+    var messagesDiv = document.getElementById("messages");
+    var inboxDiv = document.getElementById("inbox");
+
+    var currentAddress = null;
 
     loginBtn.addEventListener("click", function() {
       auth.signInWithPopup(provider)
@@ -88,28 +92,45 @@
         });
     });
 
-    sendBtn.addEventListener("click", function() {
+    saveAddressBtn.addEventListener("click", function() {
       var senderName = document.getElementById("senderName").value.trim();
+      if (!senderName) { alert("Please enter a name."); return; }
+      currentAddress = senderName + "@capoomail.com";
+      alert("Your Capoomail address is set: " + currentAddress);
+      document.getElementById("chooseAddress").style.display = "none";
+
+      // Start listening to inbox
+      inboxDiv.style.display = "block";
+      db.ref("messages").orderByChild("to").equalTo(currentAddress)
+        .on("child_added", function(snapshot) {
+          var msg = snapshot.val();
+          var div = document.createElement("div");
+          div.className = "message";
+          div.innerHTML = "<div class='from'>From: " + msg.from + "</div>" +
+                          "<div class='subject'>Subject: " + msg.subject + "</div>" +
+                          "<div>" + msg.body + "</div>";
+          messagesDiv.prepend(div);
+        });
+    });
+
+    sendBtn.addEventListener("click", function() {
+      if (!currentAddress) {
+        alert("You must set your Capoomail address first.");
+        return;
+      }
       var to = document.getElementById("to").value;
       var subject = document.getElementById("subject").value;
       var body = document.getElementById("body").value;
 
-      if (!senderName) {
-        alert("Please choose a Capoomail name.");
-        return;
-      }
-
-      var senderEmail = senderName + "@capoomail.com";
       var messageId = Date.now().toString();
-
-      db.collection("messages").doc(messageId).set({
-        from: senderEmail,
+      db.ref("messages/" + messageId).set({
+        from: currentAddress,
         to: to,
         subject: subject,
         body: body,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        timestamp: firebase.database.ServerValue.TIMESTAMP
       }).then(() => {
-        alert("Message sent from " + senderEmail + " to " + to + "!");
+        alert("Message sent from " + currentAddress + " to " + to + "!");
         document.getElementById("emailForm").reset();
       }).catch((error) => {
         alert("Error sending message: " + error.message);
