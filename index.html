@@ -3,17 +3,61 @@
 <head>
   <meta charset="UTF-8">
   <title>Capoomail</title>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      color: #222;
+    }
+    h1 { font-size: 2.5em; margin-bottom: 20px; color: #2c3e50; }
+    #loginBtn, #sendBtn {
+      background: #3498db; color: white; border: none;
+      padding: 12px 25px; font-size: 1.1em;
+      border-radius: 8px; cursor: pointer;
+      transition: all 0.3s ease; margin-top: 15px;
+    }
+    #loginBtn:hover, #sendBtn:hover { background: #2980b9; transform: scale(1.05); }
+    #emailForm { display: none; flex-direction: column; margin-top: 20px; width: 300px; }
+    input, textarea { margin: 8px 0; padding: 10px; border-radius: 6px; border: 1px solid #ccc; }
+    textarea { resize: vertical; min-height: 100px; }
+    .suffix { font-weight: bold; margin-left: 5px; }
+  </style>
 </head>
 <body>
-  <h1>Welcome to Capoomail</h1>
+  <h1>Welcome to Capoomail 🐾</h1>
   <button id="loginBtn">Login / Signup with GitHub</button>
 
-  <script type="module">
-    // Firebase config (your shrine keys)
-    const firebaseConfig = {
+  <!-- Email creation form -->
+  <form id="emailForm">
+    <!-- User chooses their shrine email name -->
+    <label>
+      Choose your Capoomail address:
+      <div style="display:flex;align-items:center;">
+        <input type="text" id="senderName" placeholder="yourname" required>
+        <span class="suffix">@capoomail.com</span>
+      </div>
+    </label>
+
+    <input type="text" id="to" placeholder="Recipient email" required>
+    <input type="text" id="subject" placeholder="Subject" required>
+    <textarea id="body" placeholder="Write your message..." required></textarea>
+    <button type="button" id="sendBtn">Send Email</button>
+  </form>
+
+  <script>
+    // Firebase config
+    var firebaseConfig = {
       apiKey: "AIzaSyAPkWlmoajpN7OaOcgtLXtWdFgogvLm2pc",
       authDomain: "capoomail-backend.firebaseapp.com",
       projectId: "capoomail-backend",
@@ -22,31 +66,54 @@
       appId: "1:896867372320:web:0a7fa3ae917295f6269b45",
       measurementId: "G-NTY7TV7F87"
     };
+    firebase.initializeApp(firebaseConfig);
 
-    // Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    var auth = firebase.auth();
+    var db = firebase.firestore();
+    var provider = new firebase.auth.GithubAuthProvider();
 
-    // GitHub provider
-    const provider = new firebase.auth.GithubAuthProvider();
+    var loginBtn = document.getElementById("loginBtn");
+    var emailForm = document.getElementById("emailForm");
+    var sendBtn = document.getElementById("sendBtn");
 
-    // Button ritual
-    document.getElementById("loginBtn").addEventListener("click", () => {
+    loginBtn.addEventListener("click", function() {
       auth.signInWithPopup(provider)
-        .then(async (result) => {
-          const user = result.user;
-          console.log("Signed in:", user.email);
-
-          // Store user in Firestore
-          await db.collection("users").doc(user.uid).set({
-            username: user.displayName || "ShrineUser",
-            email: user.email
-          });
+        .then(function(result) {
+          alert("Signed in! Choose your Capoomail address.");
+          emailForm.style.display = "flex";
+          loginBtn.style.display = "none";
         })
-        .catch((error) => {
-          console.error("Error:", error);
+        .catch(function(error) {
+          alert("Error: " + error.message);
         });
+    });
+
+    sendBtn.addEventListener("click", function() {
+      var senderName = document.getElementById("senderName").value.trim();
+      var to = document.getElementById("to").value;
+      var subject = document.getElementById("subject").value;
+      var body = document.getElementById("body").value;
+
+      if (!senderName) {
+        alert("Please choose a Capoomail name.");
+        return;
+      }
+
+      var senderEmail = senderName + "@capoomail.com";
+      var messageId = Date.now().toString();
+
+      db.collection("messages").doc(messageId).set({
+        from: senderEmail,
+        to: to,
+        subject: subject,
+        body: body,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(() => {
+        alert("Message sent from " + senderEmail + " to " + to + "!");
+        document.getElementById("emailForm").reset();
+      }).catch((error) => {
+        alert("Error sending message: " + error.message);
+      });
     });
   </script>
 </body>
