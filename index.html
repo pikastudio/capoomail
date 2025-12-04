@@ -109,20 +109,39 @@
         });
     });
 
-    // Save one-time Capoomail address
+    // Save one-time Capoomail address with uniqueness check + welcome mail
     saveAddressBtn.addEventListener("click", function() {
-      var senderName = document.getElementById("senderName").value.trim();
+      var senderName = document.getElementById("senderName").value.trim().toLowerCase();
       if (!senderName) { alert("Please enter a name."); return; }
-      currentAddress = senderName + "@capoomail.com";
+      var desiredAddress = senderName + "@capoomail.com";
 
-      db.ref("users/" + currentUser.uid).set({
-        capooAddress: currentAddress,
-        createdAt: firebase.database.ServerValue.TIMESTAMP
-      }).then(() => {
-        alert("Your Capoomail address is set: " + currentAddress);
-        document.getElementById("chooseAddress").style.display = "none";
-        startInboxListener();
-      });
+      // Check if address already taken
+      db.ref("users").orderByChild("capooAddress").equalTo(desiredAddress)
+        .once("value").then(snapshot => {
+          if (snapshot.exists()) {
+            alert("That Capoomail address is already taken!");
+          } else {
+            currentAddress = desiredAddress;
+            db.ref("users/" + currentUser.uid).set({
+              capooAddress: currentAddress,
+              createdAt: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+              alert("Your Capoomail address is set: " + currentAddress);
+              document.getElementById("chooseAddress").style.display = "none";
+              startInboxListener();
+
+              // Auto-send welcome message
+              var messageId = Date.now().toString();
+              db.ref("messages/" + messageId).set({
+                from: "capoohelper@capoo.com",
+                to: currentAddress,
+                subject: "Hi",
+                body: "hi",
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+              });
+            });
+          }
+        });
     });
 
     // Send message
@@ -131,7 +150,7 @@
         alert("You must set your Capoomail address first.");
         return;
       }
-      var to = document.getElementById("to").value;
+      var to = document.getElementById("to").value.trim().toLowerCase();
       var subject = document.getElementById("subject").value;
       var body = document.getElementById("body").value;
 
